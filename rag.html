@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAG Simulator</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:'Segoe UI',sans-serif;
+}
+
+body{
+    background:#f4f7fc;
+    color:#1a1a1a;
+    padding:30px;
+}
+
+h1{
+    text-align:center;
+    margin-bottom:10px;
+    color:#1e3a8a;
+}
+
+.subtitle{
+    text-align:center;
+    color:#555;
+    margin-bottom:30px;
+}
+
+.container{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:25px;
+}
+
+.card{
+    background:white;
+    border-radius:18px;
+    padding:20px;
+    box-shadow:0 4px 15px rgba(0,0,0,0.08);
+}
+
+.card h3{
+    color:#2563eb;
+    margin-bottom:15px;
+}
+
+textarea{
+    width:100%;
+    height:150px;
+    border:1px solid #ddd;
+    border-radius:10px;
+    padding:12px;
+    resize:none;
+}
+
+input{
+    width:100%;
+    padding:12px;
+    border:1px solid #ddd;
+    border-radius:10px;
+}
+
+button{
+    margin-top:10px;
+    padding:12px 18px;
+    border:none;
+    border-radius:10px;
+    background:#2563eb;
+    color:white;
+    cursor:pointer;
+    font-weight:bold;
+}
+
+button:hover{
+    background:#1d4ed8;
+}
+
+.step{
+    padding:12px;
+    margin:10px 0;
+    border-radius:12px;
+    background:#eef4ff;
+    border-left:5px solid #2563eb;
+    opacity:.4;
+    transition:.4s;
+}
+
+.step.active{
+    opacity:1;
+    transform:scale(1.01);
+    background:#dbeafe;
+}
+
+.chunk{
+    background:#fef3c7;
+    padding:8px;
+    margin:6px;
+    border-radius:8px;
+    display:inline-block;
+}
+
+.embedding{
+    background:#dcfce7;
+    padding:8px;
+    margin:6px;
+    border-radius:8px;
+    display:inline-block;
+    font-size:12px;
+}
+
+.vector{
+    background:#e0f2fe;
+    padding:10px;
+    margin:6px 0;
+    border-radius:8px;
+}
+
+.answer{
+    background:#ecfccb;
+    padding:15px;
+    border-radius:12px;
+    margin-top:15px;
+}
+
+.query{
+    color:#dc2626;
+    font-weight:bold;
+}
+
+.flow{
+    margin-top:20px;
+}
+
+.footer{
+    margin-top:30px;
+    text-align:center;
+    color:#666;
+}
+
+small{
+    color:#666;
+}
+</style>
+
+</head>
+<body>
+
+<h1>🤖 Interactive RAG Simulator</h1>
+<p class="subtitle">
+Retrieval Augmented Generation - Learn Every Step Visually
+</p>
+
+<div class="container">
+
+<div class="card">
+
+<h3>📄 Knowledge Base</h3>
+
+<textarea id="document">
+An operating system manages hardware and software resources.
+
+Process management is responsible for creation, scheduling and termination of processes.
+
+Memory management allocates RAM to applications and ensures efficient utilization.
+
+File management organizes, stores and retrieves files from secondary storage.
+
+Device management controls input and output devices connected to the system.
+</textarea>
+
+<button onclick="runRAG()">Run RAG Simulation</button>
+
+<br><br>
+
+<h3>❓ User Question</h3>
+
+<input id="query"
+value="What does memory management do?" />
+
+</div>
+
+<div class="card">
+
+<h3>⚙️ RAG Pipeline</h3>
+
+<div id="s1" class="step">
+1️⃣ Documents are Chunked
+</div>
+
+<div id="s2" class="step">
+2️⃣ Chunks converted to Embeddings
+</div>
+
+<div id="s3" class="step">
+3️⃣ Embeddings stored in Vector DB
+</div>
+
+<div id="s4" class="step">
+4️⃣ User Query Embedded
+</div>
+
+<div id="s5" class="step">
+5️⃣ Similarity Search & Top-K Retrieval
+</div>
+
+<div id="s6" class="step">
+6️⃣ Retrieved Context + Query sent to LLM
+</div>
+
+<div id="s7" class="step">
+7️⃣ Grounded Answer Generated
+</div>
+
+</div>
+
+</div>
+
+<div class="card flow">
+
+<h3>📚 Generated Chunks</h3>
+<div id="chunks"></div>
+
+<h3>🔢 Embeddings</h3>
+<div id="embeddings"></div>
+
+<h3>🗄️ Vector Database</h3>
+<div id="vectordb"></div>
+
+<h3>🎯 Retrieved Chunks</h3>
+<div id="retrieval"></div>
+
+<h3>🧠 LLM Final Answer</h3>
+<div id="answer"></div>
+
+</div>
+
+<div class="footer">
+RAG = Retrieval + Augmented Context + Generation
+</div>
+
+<script>
+
+function resetSteps()
+{
+    document.querySelectorAll(".step")
+    .forEach(x=>x.classList.remove("active"));
+}
+
+function activate(id)
+{
+    document.getElementById(id)
+    .classList.add("active");
+}
+
+function fakeEmbedding(text)
+{
+    let arr=[];
+
+    for(let i=0;i<5;i++)
+    {
+        arr.push(
+            Math.floor(Math.random()*100)
+        );
+    }
+
+    return "["+arr.join(", ")+"]";
+}
+
+async function runRAG()
+{
+    resetSteps();
+
+    chunks.innerHTML="";
+    embeddings.innerHTML="";
+    vectordb.innerHTML="";
+    retrieval.innerHTML="";
+    answer.innerHTML="";
+
+    let documentText =
+        document.getElementById("document").value;
+
+    let query =
+        document.getElementById("query").value;
+
+    let docs =
+        documentText
+            .split(".")
+            .map(x=>x.trim())
+            .filter(x=>x.length>10);
+
+    activate("s1");
+
+    docs.forEach(chunk=>{
+        chunks.innerHTML +=
+        `<div class="chunk">${chunk}</div>`;
+    });
+
+    await sleep(1000);
+
+    activate("s2");
+
+    let embeddingsStore=[];
+
+    docs.forEach(chunk=>{
+
+        let emb=fakeEmbedding(chunk);
+
+        embeddingsStore.push({
+            text:chunk,
+            emb:emb
+        });
+
+        embeddings.innerHTML +=
+        `<div class="embedding">
+         ${emb}
+        </div>`;
+    });
+
+    await sleep(1000);
+
+    activate("s3");
+
+    embeddingsStore.forEach(item=>{
+
+        vectordb.innerHTML += `
+        <div class="vector">
+        📄 ${item.text}
+        <br>
+        🔢 ${item.emb}
+        </div>
+        `;
+    });
+
+    await sleep(1000);
+
+    activate("s4");
+
+    let queryEmbedding =
+        fakeEmbedding(query);
+
+    retrieval.innerHTML = `
+    <p>
+    <span class="query">
+    Query Embedding:
+    </span>
+    ${queryEmbedding}
+    </p>
+    `;
+
+    await sleep(1000);
+
+    activate("s5");
+
+    let relevant=
+    docs.filter(x=>
+    x.toLowerCase()
+    .includes("memory")
+    );
+
+    if(relevant.length===0)
+    {
+        relevant.push(docs[0]);
+    }
+
+    relevant.forEach(chunk=>{
+
+        retrieval.innerHTML += `
+        <div class="chunk">
+        ${chunk}
+        </div>
+        `;
+    });
+
+    await sleep(1000);
+
+    activate("s6");
+
+    await sleep(700);
+
+    activate("s7");
+
+    answer.innerHTML = `
+    <div class="answer">
+    <b>User Question:</b>
+    ${query}
+    <br><br>
+
+    <b>Retrieved Context:</b>
+    ${relevant.join(". ")}
+    <br><br>
+
+    <b>LLM Response:</b><br>
+    Memory management is a core operating
+    system function that allocates RAM to
+    applications and ensures efficient
+    utilization of memory resources.
+    </div>
+    `;
+}
+
+function sleep(ms)
+{
+ return new Promise(
+ resolve=>setTimeout(resolve,ms)
+ );
+}
+</script>
+
+</body>
+</html>
