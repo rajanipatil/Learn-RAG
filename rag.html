@@ -356,10 +356,32 @@ async function runRAG()
 
     activate("s5");
 
-    let relevant=
-    docs.filter(x=>
-    x.toLowerCase()
-    .includes("memory")
+  function scoreChunk(chunk, query){
+
+    const qWords = query.toLowerCase().split(" ");
+    const cWords = chunk.toLowerCase();
+
+    let score = 0;
+
+    qWords.forEach(word=>{
+        if(cWords.includes(word)){
+            score++;
+        }
+    });
+
+    return score;
+}
+
+let ranked = docs
+.map(doc => ({
+    text: doc,
+    score: scoreChunk(doc, query)
+}))
+.sort((a,b)=>b.score-a.score);
+
+let relevant = ranked
+.slice(0,2)
+.map(x=>x.text);
     );
 
     if(relevant.length===0)
@@ -395,12 +417,16 @@ async function runRAG()
     <br><br>
 
     <b>LLM Response:</b><br>
-    Memory management is a core operating
-    system function that allocates RAM to
-    applications and ensures efficient
-    utilization of memory resources.
-    </div>
-    `;
+   let generatedAnswer = `
+Based on the retrieved context,
+the most relevant information is:
+
+${relevant.join(". ")}
+
+This answer was generated using
+the retrieved chunks rather than
+the entire document.
+`;
 }
 
 function sleep(ms)
